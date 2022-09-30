@@ -6,7 +6,7 @@ const logger = require("morgan");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.API_PORT || 3005;
 const MONGODB_URI =
   process.env.MONGODB_URI ||
   `mongodb+srv://eventsadmin:S4rmcnqQJX4LSTia@cluster0.44qxvzl.mongodb.net/events?retryWrites=true&w=majority`;
