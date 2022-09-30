@@ -5,7 +5,7 @@ const { eventModel } = require("../models/events");
 
 const getEvent = async (req, res) => {
   try {
-    const events = await eventModel.find();
+    const events = await eventModel.find().populate("users");
     res.status(200).json(events);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -13,7 +13,7 @@ const getEvent = async (req, res) => {
 };
 
 const addEvent = async (req, res, next) => {
-  const { title, description, start, end, date } = req.body;
+  const { title, description, start, end, date, users } = req.body;
 
   const validate = async (s, e, d) => {
     const startTime = dayjs(s);
@@ -54,6 +54,7 @@ const addEvent = async (req, res, next) => {
     start,
     end,
     date,
+    users,
   });
 
   try {
@@ -75,10 +76,7 @@ const updateEvent = async (req, res) => {
   const { id } = req.params;
 
   const event = {
-    title,
-    description,
-    start,
-    end,
+    ...req.body,
   };
 
   try {
