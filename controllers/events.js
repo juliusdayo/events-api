@@ -3,6 +3,41 @@ const isSameOrBefore = require("dayjs/plugin/isSameOrBefore");
 
 const { eventModel } = require("../models/events");
 
+const validate = async (s, e, d) => {
+  const startTime = dayjs(s);
+  const endTime = dayjs(e);
+  const currentTime = dayjs();
+
+  const existing = await eventModel
+    .find({
+      start: { $lte: e },
+      end: { $gte: s },
+      date: { $gte: d, $lte: dayjs(d).add(1, "day") },
+    })
+    .count();
+  //return false if hour set is less than 8am or greater that 8pm which is multiplied by 60 to get minutes
+  if (
+    startTime.hour() < 8 ||
+    endTime.hour() * 60 + endTime.minute() > 60 * 20
+  ) {
+    return { valid: false, message: "Event must be between 8am and 8pm" };
+  }
+  if (
+    (currentTime.isAfter(dayjs(d)) && startTime.isBefore(currentTime)) ||
+    dayjs(d).isBefore(currentTime)
+  ) {
+    return { valid: false, message: "Event cannot be in the past" };
+  }
+  if (startTime.isAfter(endTime)) {
+    return { valid: false, message: "Event cannot end before it starts" };
+  }
+  if (existing > 0) {
+    return { valid: false, message: "Event already exists" };
+  } else {
+    return { valid: true, message: "Event added" };
+  }
+};
+
 const getEvent = async (req, res) => {
   try {
     const events = await eventModel.find().populate("users");
@@ -14,39 +49,6 @@ const getEvent = async (req, res) => {
 
 const addEvent = async (req, res, next) => {
   const { title, description, start, end, date, users } = req.body;
-
-  const validate = async (s, e, d) => {
-    const startTime = dayjs(s);
-    const endTime = dayjs(e);
-    const currentTime = dayjs();
-
-    const existing = await eventModel
-      .find({
-        start: { $lte: e },
-        end: { $gte: s },
-        date: { $gte: d },
-      })
-      .count();
-    //return false if hour set is less than 8am or greater that 8pm which is multiplied by 60 to get minutes
-    if (
-      startTime.hour() < 8 ||
-      endTime.hour() * 60 + endTime.minute() > 60 * 20
-    ) {
-      return { valid: false, message: "Event must be between 8am and 8pm" };
-    }
-    console.log(currentTime.isAfter(dayjs(d)));
-    if (currentTime.isAfter(dayjs(d)) && startTime.isBefore(currentTime)) {
-      return { valid: false, message: "Event cannot be in the past" };
-    }
-    if (startTime.isAfter(endTime)) {
-      return { valid: false, message: "Event cannot end before it starts" };
-    }
-    if (existing > 0) {
-      return { valid: false, message: "Event already exists" };
-    }
-
-    return { valid: true, message: "Event added" };
-  };
 
   const event = new eventModel({
     title,
@@ -72,7 +74,7 @@ const addEvent = async (req, res, next) => {
 };
 
 const updateEvent = async (req, res) => {
-  const { title, description, start, end } = req.body;
+  const { title, description, start, end, date } = req.body;
   const { id } = req.params;
 
   const event = {
@@ -80,10 +82,15 @@ const updateEvent = async (req, res) => {
   };
 
   try {
-    const updatedEvent = await eventModel.findByIdAndUpdate(id, event, {
-      new: true,
-    });
-    res.status(200).json(updatedEvent);
+    const { valid, message } = await validate(start, end, date);
+    if (!valid) {
+      res.status(400).send({ message: message });
+    } else {
+      const updatedEvent = await eventModel.findByIdAndUpdate(id, event, {
+        new: true,
+      });
+      res.status(200).json(updatedEvent);
+    }
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
